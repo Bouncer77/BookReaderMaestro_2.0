@@ -287,6 +287,28 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_create_2(p_question_id numeric, p_question text, p_hint text)
+    RETURNS numeric 
+    LANGUAGE plpgsql
+AS $function$
+    DECLARE
+        l_question_id numeric := nextval('question_id_sequence');
+    BEGIN
+        
+        INSERT INTO "question" 
+            (question_id, question, hint)
+        VALUES(l_question_id, p_question, p_hint);
+    
+        RETURN l_question_id;
+        
+        EXCEPTION
+            WHEN unique_violation THEN
+                RAISE EXCEPTION 'Уже имееется вопрос с таким кодом!' USING ERRCODE = '020201';
+        
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
+
 -- 2.3 UPDATE
 CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_modify(p_question_id numeric, p_question text, p_hint text)
     RETURNS numeric 

@@ -21,3 +21,9 @@ POSSIBLE ANSWER - с пробелом - означает что таблица �
 > p_ (parametr) - для параметров 
 > l_ (local) или v_ (variable) - для переменных 
 > с_ (constant) - для констант
+
+## Перед запуском скрипта SQL на создания бд
+
+Создать папки `brm_data_tbs` и `brm_index_tbs` по путям: 
++ @set brm_db_data_tbs_loc = 'C:/Apps/PostgresSQL/data/brm_data_tbs'
++ @set brm_db_index_tbs_loc = 'C:/Apps/PostgresSQL/data/brm_index_tbs'
