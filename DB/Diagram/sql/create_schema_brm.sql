@@ -69,6 +69,8 @@ CREATE SEQUENCE :api_schema_name.questionnaire_id_sequence
     CACHE 1
     NO CYCLE;
 
+ALTER SEQUENCE :api_schema_name.questionnaire_id_sequence OWNER TO :api_schema_owner;
+
 -- 2. QUESTION
 CREATE TABLE :api_schema_name.question (
     question_id numeric NOT NULL,
@@ -92,6 +94,8 @@ CREATE SEQUENCE :api_schema_name.question_id_sequence
     MAXVALUE 9223372036854775807
     CACHE 1
     NO CYCLE;
+
+ALTER SEQUENCE :api_schema_name.question_id_sequence OWNER TO :api_schema_owner;
 
 -- 3. QUESTIONNAIRE_QUESTION
 CREATE TABLE :api_schema_name.questionnaire_question (
@@ -149,6 +153,9 @@ COMMENT ON COLUMN :api_schema_name.length_constraint.table_name IS 'Наимен
 COMMENT ON COLUMN :api_schema_name.length_constraint.field_name IS 'Наименование поля';
 COMMENT ON COLUMN :api_schema_name.length_constraint.field_length IS 'Максимальная длина поля (количестве символов)';
 COMMENT ON COLUMN :api_schema_name.length_constraint.description IS 'Описание ограничиваемого поля';
+
+ALTER TABLE :api_schema_name.length_constraint REPLICA IDENTITY FULL;
+ALTER TABLE :api_schema_name.length_constraint OWNER TO :api_schema_owner;
 
 -- ########################################### СИСТЕМНЫЕ ДАННЫЕ ###########################################
 
@@ -250,7 +257,7 @@ $function$
 
 ---------------------------------------- 2. Вопрос -----------------------------------
 
--- 2.1 GET
+-- 2.0 GET
 CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_questions()
     RETURNS TABLE (
         question_id_var numeric,
@@ -259,13 +266,27 @@ CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_questions()
     LANGUAGE plpgsql
 AS $function$
     BEGIN
-        RETURN QUERY SELECT questionnaire_id, question, hint FROM "question";
+        RETURN QUERY SELECT question_id, question, hint FROM "question";
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
+
+-- 2.1 GET
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_questions_order_by_desc()
+    RETURNS TABLE (
+        question_id_var numeric,
+        question_var text,
+        hint_var text)
+    LANGUAGE plpgsql
+AS $function$
+    BEGIN
+        RETURN QUERY SELECT question_id, question, hint FROM "question" ORDER BY question_id DESC;
     END;
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
 -- 2.2 CREATE
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_create(p_question_id numeric, p_question text, p_hint text)
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_create(p_question text, p_hint text)
     RETURNS numeric 
     LANGUAGE plpgsql
 AS $function$
@@ -275,13 +296,28 @@ AS $function$
         
         INSERT INTO "question" 
             (question_id, question, hint)
-        VALUES(l_question_id, p_question, p_hint);
+        VALUES(l_question_id, p_question::text, p_hint::text);
     
         RETURN l_question_id;
         
-        EXCEPTION
-            WHEN unique_violation THEN
-                RAISE EXCEPTION 'Уже имееется вопрос с таким кодом!' USING ERRCODE = '020201';
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
+
+-- 2.2 CREATE
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_create_2(p_question text)
+    RETURNS numeric 
+    LANGUAGE plpgsql
+AS $function$
+    DECLARE
+        l_question_id numeric := nextval('question_id_sequence');
+    BEGIN
+        
+        INSERT INTO "question" 
+            (question_id, question, hint)
+        VALUES(l_question_id, p_question::text, null);
+    
+        RETURN l_question_id;
         
     END;
 $function$
@@ -319,7 +355,7 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 2.5 Добавление вопроса в опросник
+-- 2.5 Добавление вопроса в вопросник
 CREATE OR REPLACE FUNCTION :api_schema_name.ui_add_question_to_questionnaire(p_question_id numeric, p_questionnaire_id numeric)
     RETURNS void 
     LANGUAGE plpgsql
