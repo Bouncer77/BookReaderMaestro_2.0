@@ -66,3 +66,5 @@ Postgres SQL 12
 [Курс DEV-1 - pl/pgSQL](https://postgrespro.ru/education/courses/DEV1)
 
 [DEV-1 Видеокурс](https://www.youtube.com/watch?v=8uHePp-qFNE&list=PLaFqU3KCWw6LNR1IZ814whJe89J1tRQ3t&ab_channel=PostgresProfessional)
+
+[Git туториал](https://githowto.com/ru/resolving_conflicts)

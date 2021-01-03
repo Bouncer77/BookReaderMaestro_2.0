@@ -19,8 +19,8 @@ DROP TABLE IF EXISTS :api_schema_name.length_constraint CASCADE;
 DROP SEQUENCE IF EXISTS :api_schema_name.question_id_sequence CASCADE;
 DROP SEQUENCE IF EXISTS :api_schema_name.questionnaire_id_sequence CASCADE;
 
-DROP FUNCTION IF EXISTS :api_schema_name.ui_get_questions();
-DROP FUNCTION IF EXISTS :api_schema_name.ui_get_questionnaires();
+/*DROP FUNCTION IF EXISTS :api_schema_name.ui_get_questions();
+DROP FUNCTION IF EXISTS :api_schema_name.ui_get_questionnaires();*/
 
 -- ############################################# СОЗДАНИЕ СХЕМ ############################################
 
@@ -183,24 +183,63 @@ end $$;
 
 -- ############################################# ФУНКЦИИ #############################################
 
+/* Таблица в БД
+ * 1. Вопросник (questionnaire)
+ * 2. Вопрос (question)
+ * 3. Вопросник-Вопрос (questionnaire_question)
+ * 4. Возможный ответ (possible_answer)
+ * 5. Ограничение длины (length_constraint)
+ */
+
+/* CRUD
+ * 1. Create (создание) - INSERT
+ * 2. Read (чтение) - SELECT
+ * 3. Update (модификация) - UPDATE
+ * 4. Delete (удаление) - DELETE
+ */
+
+/* 
+ * Правила нумерования функций
+ * <номер_таблицы>.<номер_CRUD_операции>.<номер_функции>
+ */
+
+/* Правила именования функциий
+ * 
+ * Префикс 1 - Назначение функции:
+ * ui_ - функции, вызываемые с User Interface - Интерфейса пользователя
+ * core_ - функции необходимые только для вызова в других функциях Core (Ядро базы данных)
+ * 
+ * Префикс 2 - CRUD операция:
+ * create_ - создание
+ * read_ - чтение
+ * update_ - модификация
+ * delete_ - удаление
+ * 
+ * Основа - Имя функции:
+ * <имя_таблицы> - для создания/чтения/модификации/удаления одной строки в таблице
+ * <имя_таблицы>+'s' - для создания/чтения/модификации/удаления одной или более строк в таблице
+ * */
+
+/* Правила описания функций:
+ * 
+ * -- <имя CRUD операции>
+ * -- <номер функции>
+ * <удалить функцию, если такая функция уже существует>
+ * -- <вызов функции>
+ * -- <проверка результата выполнения функции>
+ * <функция>
+ * */
+
 ---------------------------------------- 1. Вопросник -----------------------------------
 
--- 1.1 GET
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_questionnaires()
-    RETURNS TABLE (
-        questionnaire_id_var numeric,
-        name_var text,
-        description_var text)
-    LANGUAGE plpgsql
-AS $function$
-    BEGIN
-        RETURN QUERY SELECT questionnaire_id, name, description FROM "questionnaire";
-    END;
-$function$
-    SET search_path = :api_schema_name, pg_temp;
+DROP FUNCTION :api_schema_name.ui_questionnaire_create(p_name text, p_description text);
 
--- 1.2 CREATE
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_questionnaire_create(p_questionnaire_id numeric, p_name text, p_description text)
+-- CREATE
+-- 1.1.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_create_questionnaire(p_name text, p_description text);
+-- SELECT * FROM :api_schema_name.ui_create_questionnaire('Java Core', 'Контрольные вопросы часть 1. Базовый синтаксис.');
+-- SELECT * FROM :api_schema_name.questionnaire;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_create_questionnaire(p_name text, p_description text)
     RETURNS numeric 
     LANGUAGE plpgsql
 AS $function$
@@ -212,7 +251,7 @@ AS $function$
             (questionnaire_id, "name", description)
         VALUES(l_questionnaire_id, p_name, p_description);
     
-        RETURN l_dictionary_id;
+        RETURN l_questionnaire_id;
         
         EXCEPTION
             WHEN unique_violation THEN
@@ -222,8 +261,54 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 1.3 UPDATE
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_questionnaire_modify(p_questionnaire_id numeric, p_name text, p_description text)
+DROP FUNCTION :api_schema_name.ui_get_questionnaires();
+
+-- READ
+-- 1.2.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_read_questionnaires();
+-- SELECT * FROM :api_schema_name.ui_read_questionnaires();
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_read_questionnaires()
+    RETURNS TABLE (
+        questionnaire_id_var numeric,
+        name_var text,
+        description_var text)
+    LANGUAGE plpgsql
+AS $function$
+    BEGIN
+        RETURN QUERY SELECT questionnaire_id, name, description FROM "questionnaire" ORDER BY questionnaire_id DESC;
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
+
+DROP FUNCTION :api_schema_name.ui_read_questionnaire(p_questionnaire_id numeric);
+
+-- 1.2.2
+DROP FUNCTION IF EXISTS :api_schema_name.ui_read_questionnaire_by_id(p_questionnaire_id numeric);
+-- SELECT * FROM :api_schema_name.ui_read_questionnaire_by_id(101);
+-- SELECT * FROM :api_schema_name.questionnaire;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_read_questionnaire_by_id(p_questionnaire_id numeric)
+    RETURNS TABLE (
+        questionnaire_id_var numeric,
+        name_var text,
+        description_var text)
+    LANGUAGE plpgsql
+AS $function$
+    DECLARE 
+        l_questionnaire_rec record;
+    BEGIN
+        RETURN QUERY SELECT questionnaire_id, "name", description FROM "questionnaire" WHERE questionnaire_id = p_questionnaire_id;
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
+
+DROP FUNCTION :api_schema_name.ui_questionnaire_modify(p_questionnaire_id numeric, p_name text, p_description text);
+
+-- UPDATE
+-- 1.3.1 
+DROP FUNCTION IF EXISTS :api_schema_name.ui_update_questionnaire(p_questionnaire_id numeric, p_name text, p_description text);
+-- SELECT * FROM :api_schema_name.ui_update_questionnaire(102, 'Новые вопросы', 'Описание новых вопросов');
+-- SELECT * FROM :api_schema_name.questionnaire;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_update_questionnaire(p_questionnaire_id numeric, p_name text, p_description text)
     RETURNS numeric 
     LANGUAGE plpgsql
 AS $function$
@@ -239,8 +324,12 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 1.4 DELETE
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_questionnaire_delete(p_questionnaire_id numeric)
+-- DELETE
+-- 1.4.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_questionnaire_delete_by_id(p_questionnaire_id numeric);
+--SELECT * FROM :api_schema_name.ui_questionnaire_delete_by_id(104);
+--SELECT * FROM :api_schema_name.questionnaire;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_questionnaire_delete_by_id(p_questionnaire_id numeric)
     RETURNS numeric 
     LANGUAGE plpgsql
 AS $function$
@@ -254,25 +343,37 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
-
 ---------------------------------------- 2. Вопрос -----------------------------------
 
--- 2.0 GET
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_questions()
-    RETURNS TABLE (
-        question_id_var numeric,
-        question_var text,
-        hint_var text)
+-- CREATE
+-- 2.1.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_question_create(p_question text, p_hint text);
+-- SELECT * FROM :api_schema_name.ui_question_create('К какому типа языка программирование относиться Java?', 'байт-код подается в интерпретатор(Виртуальная машина)');
+-- SELECT * FROM :api_schema_name.question;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_create(p_question text, p_hint text)
+    RETURNS numeric 
     LANGUAGE plpgsql
 AS $function$
+    DECLARE
+        l_question_id numeric := nextval('question_id_sequence');
     BEGIN
-        RETURN QUERY SELECT question_id, question, hint FROM "question";
+        
+        INSERT INTO "question" 
+            (question_id, question, hint)
+        VALUES(l_question_id, p_question, p_hint);
+    
+        RETURN l_question_id;
+        
     END;
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 2.1 GET
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_questions_order_by_desc()
+-- READ
+-- 2.2.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_get_questions();
+-- SELECT * FROM :api_schema_name.ui_get_questions();
+-- SELECT * FROM :api_schema_name.question;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_questions()
     RETURNS TABLE (
         question_id_var numeric,
         question_var text,
@@ -285,46 +386,29 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 2.2 CREATE
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_create(p_question text, p_hint text)
-    RETURNS numeric 
+-- 2.2.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_get_question_by_id();
+-- SELECT * FROM :api_schema_name.ui_get_question_by_id(116);
+-- SELECT * FROM :api_schema_name.question;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_question_by_id(p_question_id numeric)
+    RETURNS TABLE (
+        question_id_var numeric,
+        question_var text,
+        hint_var text)
     LANGUAGE plpgsql
 AS $function$
-    DECLARE
-        l_question_id numeric := nextval('question_id_sequence');
     BEGIN
-        
-        INSERT INTO "question" 
-            (question_id, question, hint)
-        VALUES(l_question_id, p_question::text, p_hint::text);
-    
-        RETURN l_question_id;
-        
+        RETURN QUERY SELECT question_id, question, hint FROM "question" WHERE question_id = p_question_id;
     END;
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 2.2 CREATE
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_create_2(p_question text)
-    RETURNS numeric 
-    LANGUAGE plpgsql
-AS $function$
-    DECLARE
-        l_question_id numeric := nextval('question_id_sequence');
-    BEGIN
-        
-        INSERT INTO "question" 
-            (question_id, question, hint)
-        VALUES(l_question_id, p_question::text, null);
-    
-        RETURN l_question_id;
-        
-    END;
-$function$
-    SET search_path = :api_schema_name, pg_temp;
-
--- 2.3 UPDATE
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_modify(p_question_id numeric, p_question text, p_hint text)
+-- UPDATE
+-- 2.3.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_update_question(p_question_id numeric, p_question text, p_hint text);
+-- SELECT * FROM :api_schema_name.ui_update_question(115, 'Что такое Java виртуальная машина?', 'Переводит наш скомпилированный байт-код в машинные операции');
+-- SELECT * FROM :api_schema_name.question;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_update_question(p_question_id numeric, p_question text, p_hint text)
     RETURNS numeric 
     LANGUAGE plpgsql
 AS $function$
@@ -340,8 +424,12 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 2.4 DELETE
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_delete(p_question_id numeric)
+-- DELETE
+-- 2.4.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_question_delete(p_question_id numeric);
+-- SELECT * FROM :api_schema_name.ui_question_delete_by_id(116);
+-- SELECT * FROM :api_schema_name.question;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_question_delete_by_id(p_question_id numeric)
     RETURNS numeric 
     LANGUAGE plpgsql
 AS $function$
@@ -355,7 +443,16 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 2.5 Добавление вопроса в вопросник
+---------------------------------------- 3. Вопросник-Вопрос -----------------------------------
+
+-- CREATE
+/* Добавление вопроса в вопросник */
+-- 3.1.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_add_question_to_questionnaire(p_question_id numeric, p_questionnaire_id numeric);
+-- SELECT * FROM :api_schema_name.ui_add_question_to_questionnaire(115, 101);
+/*SELECT * FROM :api_schema_name.questionnaire_question;
+SELECT * FROM :api_schema_name.questionnaire;
+SELECT * FROM  :api_schema_name.question;*/
 CREATE OR REPLACE FUNCTION :api_schema_name.ui_add_question_to_questionnaire(p_question_id numeric, p_questionnaire_id numeric)
     RETURNS void 
     LANGUAGE plpgsql
@@ -375,15 +472,149 @@ AS $function$
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
+-- READ
+-- 3.2.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_read_questionnaire_questions();
+-- SELECT * FROM :api_schema_name.ui_read_questionnaire_questions();
+-- SELECT * FROM :api_schema_name.questionnaire_question;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_read_questionnaire_questions()
+    RETURNS TABLE (
+        questionnaire_id_var numeric,
+        questionnaire_name_var text,
+        question_id_var numeric,
+        question_var text)
+    LANGUAGE plpgsql
+AS $function$
+    BEGIN
+        RETURN QUERY 
+        SELECT qq.questionnaire_id, qr."name", qq.question_id, qn.question 
+        FROM questionnaire_question AS qq 
+        
+        JOIN questionnaire AS qr
+        ON qq.questionnaire_id = qr.questionnaire_id
+        
+        JOIN question AS qn
+        ON qq.question_id = qn.question_id
+        
+        ORDER BY qq.questionnaire_id DESC, qq.question_id DESC;
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
 
----------------------------------------- 3. Вопросник-Вопрос -----------------------------------
+-- UPDATE
+-- 3.3.1
+
+-- DELETE
+-- 3.4.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_delete_questionnaire_question_by_questionnaire_id(p_questionnaire_id numeric);
+-- SELECT * FROM :api_schema_name.ui_delete_questionnaire_question_by_questionnaire_id(101);
+-- SELECT * FROM :api_schema_name.questionnaire_question;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_delete_questionnaire_question_by_questionnaire_id(p_questionnaire_id numeric)
+    RETURNS void
+    LANGUAGE plpgsql
+AS $function$
+    BEGIN
+        
+        DELETE FROM questionnaire_question
+        WHERE questionnaire_id = p_questionnaire_id;
+        
+        RETURN;
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
 
 ---------------------------------------- 4. Возможный ответ -----------------------------------
 
+-- CREATE
+-- 4.1.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_create_possible_answer(p_question_id numeric, p_answer text, p_is_truthful boolean, p_explanation text);
+/*SELECT * FROM :api_schema_name.ui_create_possible_answer(115, 'Возможный ответ 1', false, 'Так 1');
+SELECT * FROM :api_schema_name.ui_create_possible_answer(115, 'Возможный ответ 2', false, 'Так 2');
+SELECT * FROM :api_schema_name.ui_create_possible_answer(115, 'Возможный ответ 3', true, 'Так 3 - Верный');
+SELECT * FROM :api_schema_name.ui_create_possible_answer(115, 'Возможный ответ 4', false, 'Так 4');*/
+
+/*SELECT * FROM :api_schema_name.possible_answer;
+SELECT * FROM :api_schema_name.question;*/
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_create_possible_answer(p_question_id numeric, p_answer text, p_is_truthful boolean, p_explanation text)
+    RETURNS void
+    LANGUAGE plpgsql
+AS $function$
+    DECLARE
+        l_possible_answer_id numeric;
+    BEGIN
+        
+        SELECT (coalesce(max(possible_answer_id), 0) + 1) INTO l_possible_answer_id FROM possible_answer WHERE question_id = p_question_id;
+        
+        INSERT INTO possible_answer
+            (possible_answer_id, question_id, answer, is_truthful, explanation)
+        VALUES(l_possible_answer_id, p_question_id, p_answer, p_is_truthful, p_explanation);
+
+        RETURN;
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
+
+-- READ
+-- 4.2.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_read_possible_answers();
+--SELECT * FROM :api_schema_name.ui_read_possible_answers();
+/*SELECT * FROM :api_schema_name.possible_answer;
+SELECT * FROM :api_schema_name.question;*/
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_read_possible_answers()
+    RETURNS TABLE (
+        question_id_var numeric,
+        possible_answer_id_var numeric,
+        answer_var text,
+        is_truthful_var boolean,
+        explanation_var text)
+    LANGUAGE plpgsql
+AS $function$
+    BEGIN
+        RETURN QUERY 
+        SELECT question_id, possible_answer_id, answer, is_truthful, explanation
+        FROM possible_answer
+        ORDER BY question_id DESC, possible_answer_id DESC;
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
+
+-- 4.2.2
+DROP FUNCTION IF EXISTS :api_schema_name.ui_read_possible_answer_by_question_id(p_question_id numeric);
+-- SELECT * FROM :api_schema_name.ui_read_possible_answer_by_question_id(115);
+/*SELECT * FROM :api_schema_name.possible_answer;
+SELECT * FROM :api_schema_name.question;*/
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_read_possible_answer_by_question_id(p_question_id numeric)
+    RETURNS TABLE (
+        possible_answer_id_var numeric,
+        answer_var text,
+        is_truthful_var boolean,
+        explanation_var text)
+    LANGUAGE plpgsql
+AS $function$
+    BEGIN
+        RETURN QUERY 
+        SELECT possible_answer_id, answer, is_truthful, explanation
+        FROM possible_answer
+        WHERE question_id = p_question_id
+        ORDER BY possible_answer_id DESC;
+    END;
+$function$
+    SET search_path = :api_schema_name, pg_temp;
+
+-- UPDATE
+
+-- DELETE
+
 ---------------------------------------- 5. Ограничение длины -----------------------------------
 
--- 5.1
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_constraints()
+-- CREATE
+
+-- READ
+-- 5.2.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_read_length_constraints();
+-- SELECT * FROM :api_schema_name.ui_read_length_constraints();
+-- SELECT * FROM :api_schema_name.length_constraint;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_read_length_constraints()
     RETURNS TABLE (
         constraint_id_var numeric,
         name_var text,
@@ -392,13 +623,20 @@ CREATE OR REPLACE FUNCTION :api_schema_name.ui_get_constraints()
     LANGUAGE plpgsql
 AS $function$
     BEGIN
-        RETURN QUERY select constraint_id, concat(table_name, '.',field_name), field_length, description from length_constraint;
+        RETURN QUERY
+        SELECT constraint_id, concat(table_name, '.',field_name), field_length, description
+        FROM length_constraint
+        ORDER BY constraint_id;
     END;
 $function$
     SET search_path = :api_schema_name, pg_temp;
 
--- 5.2
-CREATE OR REPLACE FUNCTION :api_schema_name.ui_constraint_modify(p_constraint_id numeric, p_length numeric)
+-- UPDATE
+-- 5.3.1
+DROP FUNCTION IF EXISTS :api_schema_name.ui_update_constraint(p_constraint_id numeric, p_length numeric);
+-- SELECT * FROM :api_schema_name.ui_update_constraint(1, 120);
+-- SELECT * FROM :api_schema_name.length_constraint;
+CREATE OR REPLACE FUNCTION :api_schema_name.ui_update_constraint(p_constraint_id numeric, p_length numeric)
     RETURNS numeric 
     LANGUAGE plpgsql
 AS $function$
@@ -411,8 +649,8 @@ AS $function$
         SELECT table_name, field_name INTO l_table_name, l_field_name FROM length_constraint WHERE constraint_id = p_constraint_id;
         l_constraint_name := concat('length_constraint.', l_table_name, '.', l_field_name);
         
-        execute format('ALTER TABLE %s DROP constraint IF EXISTS "%s"', l_table_name,l_constraint_name);
-        execute format('ALTER TABLE %s ADD CONSTRAINT "%s" CHECK(char_length(cast(%s as text)) <= %s);', l_table_name, l_constraint_name, l_field_name, p_length::text);
+        EXECUTE format('ALTER TABLE %s DROP constraint IF EXISTS "%s"', l_table_name,l_constraint_name);
+        EXECUTE format('ALTER TABLE %s ADD CONSTRAINT "%s" CHECK(char_length(cast(%s as text)) <= %s);', l_table_name, l_constraint_name, l_field_name, p_length::text);
 
         UPDATE "length_constraint" SET field_length = p_length WHERE constraint_id = p_constraint_id;
     
@@ -425,4 +663,6 @@ AS $function$
     END;
 $function$
     SET search_path = :api_schema_name, pg_temp;
+
+-- DELETE
 
